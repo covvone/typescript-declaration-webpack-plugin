@@ -7,6 +7,28 @@ function TypescriptDeclarationPlugin(options) {
     this.regexImportModule = /import ({.+}|\*) as ([A-Za-z0-1-]+) from ('|")([A-Za-z0-1-]+)('|");/;
 }
 
+var fs = require("fs");
+
+// checks if module is available to load
+function isModuleAvailableSync(moduleName) {
+    var exists = false; // return value, boolean
+    var dirSeparator = require("path").sep
+
+    // scan each module.paths. If there exists
+    // node_modules/moduleName then
+    // return true. Otherwise return false.
+    module.paths.forEach(function(nodeModulesPath)
+    {
+        if(fs.existsSync(nodeModulesPath + dirSeparator + moduleName))
+        {
+            exists = true;
+            return false; // break forEach
+        }
+    });
+
+    return exists;
+}
+
 TypescriptDeclarationPlugin.prototype.log = function(m) {
 	console.log('[TypescriptDeclarationPlugin] ' + m);
 };
@@ -23,13 +45,13 @@ TypescriptDeclarationPlugin.prototype.apply = function(compiler) {
 				foundDeclaration = true;
             }
         }
-		
+
 		if(!foundDeclaration) {
 			_this.log('No TypeScript declarations has been found!');
 			_this.log('Make sure declaration are activated in tsconfig.ts!');
 			return callback();
         }
-        
+
         // Mergin files.
         var declarations = [], imports = [];
         for(var name in declarationFiles) {
@@ -60,8 +82,11 @@ TypescriptDeclarationPlugin.prototype.apply = function(compiler) {
                                 mode: 'module'
                             });
                         }
+                    } else if (isModuleAvailableSync(line.slice(line.lastIndexOf('from') + 6, line.length - 2))) {
+                        ignoreLine = false;
+                    } else {
+                        ignoreLine = true;
                     }
-                    ignoreLine = true;
                 } else if(line.indexOf('/// ') === 0) {
                     // Directive import
                     var matches = _this.regexImportDirective.exec(line), importTracked = false;
